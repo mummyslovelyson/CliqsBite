@@ -16,17 +16,18 @@ import { useCart } from "../context/CartContext";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
+const SPECIAL_MENU_IMG = require("../../assets/images/onboarding-special.jpg");
+
 const ONBOARDING_SLIDES = [
   {
     id: "slide-1",
-    tag: "AUTHENTIC GHANAIAN FLAVORS 🇬🇭",
+    tag: "TODAY'S SPECIAL DISHES 🍲",
     tagBg: "#EA580C",
-    title: "Freshly Made Ghanaian Delicacies",
+    title: "Daily Specials & Hot Ghanaian Delicacies",
     description:
-      "Savor authentic smoky party jollof, Accra waakye with all the works, hot banku with charcoal-grilled tilapia, and pounded fufu cooked to perfection.",
-    image:
-      "https://images.unsplash.com/photo-1604329760661-e71dc83f8f26?w=900&auto=format&fit=crop&q=80",
-    highlight: "Sizzling & Homemade",
+      "Enjoy daily special deals up to 50% off! Savor authentic smoky party jollof, Accra waakye, hot banku, crispy fries, and delicious pastas cooked fresh daily.",
+    image: SPECIAL_MENU_IMG,
+    highlight: "Special Deals & Combos",
   },
   {
     id: "slide-2",
@@ -157,7 +158,7 @@ export default function OnboardingScreen({ onComplete }) {
             {/* Slide Hero Card with Image */}
             <View style={styles.imageCard}>
               <Image
-                source={{ uri: slide.image }}
+                source={typeof slide.image === "string" ? { uri: slide.image } : slide.image}
                 style={{ width: "100%", height: "100%" }}
                 contentFit="cover"
                 transition={200}
