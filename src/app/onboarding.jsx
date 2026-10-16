@@ -17,6 +17,7 @@ import { useCart } from "../context/CartContext";
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
 const SPECIAL_MENU_IMG = require("../../assets/images/onboarding-special.jpg");
+const BURGERS_PIZZA_IMG = require("../../assets/images/onboarding-burgers-pizza.jpg");
 
 const ONBOARDING_SLIDES = [
   {
@@ -31,36 +32,35 @@ const ONBOARDING_SLIDES = [
   },
   {
     id: "slide-2",
+    tag: "BURGERS, PIZZA & CRISPY CHICKEN 🍔🍕",
+    tagBg: "#DC2626",
+    title: "Gourmet Fast Food & Hottest Promos",
+    description:
+      "Craving juicy chicken burgers, hot cheesy pizza slices, or golden French fries with crispy fried chicken? Order fast with 24/7 delivery right to your door.",
+    image: BURGERS_PIZZA_IMG,
+    highlight: "Up to 50% Off Promos",
+  },
+  {
+    id: "slide-3",
     tag: "AI CHEF & VOICE AGENT 🤖",
     tagBg: "#7C3AED",
     title: "Order With Your Voice or Chat",
     description:
-      "Tap the new AI Bot tab to speak or chat naturally. Tell the AI 'Order 2 Jollof and kelewele to East Legon' and watch your cart populate instantly.",
+      "Tap the new AI Bot tab to speak or chat naturally. Tell Chef Kwame 'Find spicy meals under 80 cedis' and watch your recommendations appear instantly.",
     image:
       "https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=900&auto=format&fit=crop&q=80",
     highlight: "Hands-Free Ordering",
   },
   {
-    id: "slide-3",
-    tag: "LIGHTNING FAST DISPATCH 🛵",
+    id: "slide-4",
+    tag: "LIGHTNING FAST DISPATCH & MOMO 🛵💳",
     tagBg: "#16A34A",
-    title: "Hot Doorstep Delivery & GPS",
+    title: "Live GPS Tracking & Instant MoMo Pay",
     description:
-      "Dispatched in heat-retaining thermal packs. Track your assigned rider live on the interactive map from kitchen grill to your front door.",
+      "Dispatched in heat-retaining thermal packs. Track your assigned rider live on the interactive map and pay securely with MTN MoMo, Telecel Cash, or cards.",
     image:
       "https://images.unsplash.com/photo-1617347454431-f49d7ff5c3b1?w=900&auto=format&fit=crop&q=80",
-    highlight: "Live Rider Tracking",
-  },
-  {
-    id: "slide-4",
-    tag: "SECURE MOBILE MONEY & REWARDS 💳",
-    tagBg: "#2563EB",
-    title: "Instant MoMo & Card Payments",
-    description:
-      "Pay securely with MTN MoMo, Telecel Cash, or cards. Earn exclusive discounts, redeem CliqsPoints, and unlock free delivery.",
-    image:
-      "https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=900&auto=format&fit=crop&q=80",
-    highlight: "Cashless & Safe",
+    highlight: "Live Tracking & Cashless",
   },
 ];
 
