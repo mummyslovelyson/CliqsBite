@@ -29,6 +29,8 @@ const ONBOARDING_SLIDES = [
       "Enjoy daily special deals up to 50% off! Savor authentic smoky party jollof, Accra waakye, hot banku, crispy fries, and delicious pastas cooked fresh daily.",
     image: SPECIAL_MENU_IMG,
     highlight: "Special Deals & Combos",
+    contentFit: "contain",
+    cardBg: "#3A0E0E",
   },
   {
     id: "slide-2",
@@ -39,6 +41,8 @@ const ONBOARDING_SLIDES = [
       "Craving juicy chicken burgers, hot cheesy pizza slices, or golden French fries with crispy fried chicken? Order fast with 24/7 delivery right to your door.",
     image: BURGERS_PIZZA_IMG,
     highlight: "Up to 50% Off Promos",
+    contentFit: "contain",
+    cardBg: "#1C0505",
   },
   {
     id: "slide-3",
@@ -50,6 +54,8 @@ const ONBOARDING_SLIDES = [
     image:
       "https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=900&auto=format&fit=crop&q=80",
     highlight: "Hands-Free Ordering",
+    contentFit: "cover",
+    cardBg: "#1C1917",
   },
   {
     id: "slide-4",
@@ -61,6 +67,8 @@ const ONBOARDING_SLIDES = [
     image:
       "https://images.unsplash.com/photo-1617347454431-f49d7ff5c3b1?w=900&auto=format&fit=crop&q=80",
     highlight: "Live Tracking & Cashless",
+    contentFit: "cover",
+    cardBg: "#1C1917",
   },
 ];
 
@@ -156,11 +164,11 @@ export default function OnboardingScreen({ onComplete }) {
             style={[styles.slideContainer, { width: SCREEN_WIDTH }]}
           >
             {/* Slide Hero Card with Image */}
-            <View style={styles.imageCard}>
+            <View style={[styles.imageCard, slide.cardBg ? { backgroundColor: slide.cardBg } : null]}>
               <Image
                 source={typeof slide.image === "string" ? { uri: slide.image } : slide.image}
                 style={{ width: "100%", height: "100%" }}
-                contentFit="cover"
+                contentFit={slide.contentFit || "contain"}
                 transition={200}
               />
               <View style={styles.overlay}>
@@ -305,69 +313,73 @@ const styles = StyleSheet.create({
     color: "#78716C",
   },
   slideContainer: {
-    paddingHorizontal: 24,
+    paddingHorizontal: 20,
     flex: 1,
     justifyContent: "space-between",
-    paddingVertical: 8,
+    paddingVertical: 6,
   },
   imageCard: {
     flex: 1,
-    borderRadius: 36,
+    borderRadius: 28,
     overflow: "hidden",
     backgroundColor: "#1C1917",
     borderWidth: 1,
     borderColor: "#EFE5D6",
-    maxHeight: "52%",
+    maxHeight: "58%",
     position: "relative",
+    justifyContent: "center",
+    alignItems: "center",
   },
   overlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(0, 0, 0, 0.25)",
+    position: "absolute",
+    top: 14,
+    left: 14,
+    right: 14,
+    flexDirection: "row",
+    alignItems: "center",
     justifyContent: "space-between",
-    padding: 20,
+    zIndex: 10,
   },
   badge: {
-    alignSelf: "flex-start",
-    paddingHorizontal: 12,
+    paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 999,
   },
   badgeText: {
-    fontSize: 10,
+    fontSize: 9,
     fontWeight: "900",
     color: "#ffffff",
     letterSpacing: 0.5,
   },
   highlightBadge: {
-    alignSelf: "flex-end",
-    backgroundColor: "rgba(0, 0, 0, 0.6)",
-    paddingHorizontal: 12,
+    backgroundColor: "rgba(0, 0, 0, 0.65)",
+    paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 999,
     borderWidth: 1,
     borderColor: "rgba(255, 255, 255, 0.2)",
   },
   highlightText: {
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: "900",
     color: "#ffffff",
   },
   textContainer: {
-    paddingVertical: 20,
+    paddingVertical: 14,
   },
   titleText: {
-    fontSize: 24,
+    fontSize: 22,
     fontWeight: "900",
     color: "#1C1917",
     letterSpacing: -0.5,
-    lineHeight: 32,
-    marginBottom: 10,
+    lineHeight: 28,
+    marginBottom: 6,
   },
   descText: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: "500",
     color: "#78716C",
-    lineHeight: 22,
+    lineHeight: 20,
   },
   footer: {
     paddingHorizontal: 24,
