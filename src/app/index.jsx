@@ -139,6 +139,9 @@ export default function HomeScreen() {
     orders,
     hasCompletedOnboarding,
     completeOnboarding,
+    liveMenu,
+    livePromotions,
+    liveCategories,
   } = useCart();
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [favorites, setFavorites] = useState({});
@@ -149,6 +152,46 @@ export default function HomeScreen() {
   const [homeSort, setHomeSort] = useState("popular");
   const [sortModalVisible, setSortModalVisible] = useState(false);
 
+  // Active Banners driven by Admin Dashboard Promotions
+  const activeBanners = useMemo(() => {
+    if (
+      livePromotions?.banners &&
+      Array.isArray(livePromotions.banners) &&
+      livePromotions.banners.length > 0
+    ) {
+      return livePromotions.banners.map((b, idx) => ({
+        id: b.id || `admin-banner-${idx}`,
+        tag: b.tag || "SPECIAL OFFER",
+        tagBg: b.color || "#FF6000",
+        title: b.title,
+        subtitle: b.subtitle || b.description || "Hot kitchen deal",
+        code: b.code ? `Code: ${b.code}` : "Admin Special",
+        image: b.image ? { uri: b.image } : BANNER_IMG,
+      }));
+    }
+    return BANNERS;
+  }, [livePromotions]);
+
+  // Active Categories driven by Admin Dashboard
+  const activeCategories = useMemo(() => {
+    if (
+      liveCategories &&
+      Array.isArray(liveCategories) &&
+      liveCategories.length > 0
+    ) {
+      const enabled = liveCategories.filter((c) => c.isEnabled !== false);
+      return [
+        { id: "all", name: "All", image: IMAGES.bucket },
+        ...enabled.map((c) => ({
+          id: c.slug || c.id,
+          name: c.name,
+          image: c.image || IMAGES.bucket,
+        })),
+      ];
+    }
+    return CATEGORIES;
+  }, [liveCategories]);
+
   // Sliding Banners State & Dimensions
   const bannerScrollRef = useRef(null);
   const [activeBannerIndex, setActiveBannerIndex] = useState(0);
@@ -158,10 +201,10 @@ export default function HomeScreen() {
 
   // Auto-sliding interval
   useEffect(() => {
-    if (BANNERS.length <= 1) return;
+    if (activeBanners.length <= 1) return;
     const timer = setInterval(() => {
       setActiveBannerIndex((prevIndex) => {
-        const nextIndex = (prevIndex + 1) % BANNERS.length;
+        const nextIndex = (prevIndex + 1) % activeBanners.length;
         bannerScrollRef.current?.scrollTo({
           x: nextIndex * (bannerCardWidth + bannerGap),
           animated: true,
@@ -171,12 +214,16 @@ export default function HomeScreen() {
     }, 3500);
 
     return () => clearInterval(timer);
-  }, [bannerCardWidth]);
+  }, [bannerCardWidth, activeBanners.length]);
 
   const handleBannerScroll = (event) => {
     const contentOffset = event.nativeEvent.contentOffset.x;
     const index = Math.round(contentOffset / (bannerCardWidth + bannerGap));
-    if (index >= 0 && index < BANNERS.length && index !== activeBannerIndex) {
+    if (
+      index >= 0 &&
+      index < activeBanners.length &&
+      index !== activeBannerIndex
+    ) {
       setActiveBannerIndex(index);
     }
   };
@@ -194,19 +241,30 @@ export default function HomeScreen() {
       price: item.price,
       quantity: 1,
       image: item.image,
+      inStock: item.inStock !== false && item.isAvailable !== false,
     });
   };
 
-  // Filter & sort dishes for Home feed dynamically
+  // Filter & sort dishes for Home feed dynamically from Admin-managed liveMenu
   const filteredAndSortedMeals = useMemo(() => {
-    let result = MENU_ITEMS;
+    const source =
+      liveMenu && Array.isArray(liveMenu) && liveMenu.length > 0
+        ? liveMenu
+        : MENU_ITEMS;
+    let result = source;
 
     // Filter by category if selected
     if (selectedCategory && selectedCategory !== "All") {
       result = result.filter(
         (m) =>
-          m.category.toLowerCase().includes(selectedCategory.toLowerCase()) ||
-          selectedCategory.toLowerCase().includes(m.category.toLowerCase())
+          (m.category &&
+            m.category
+              .toLowerCase()
+              .includes(selectedCategory.toLowerCase())) ||
+          (selectedCategory &&
+            selectedCategory
+              .toLowerCase()
+              .includes((m.category || "").toLowerCase()))
       );
     }
 
@@ -215,16 +273,16 @@ export default function HomeScreen() {
       const q = searchQuery.trim().toLowerCase();
       result = result.filter(
         (m) =>
-          m.title.toLowerCase().includes(q) ||
-          m.description.toLowerCase().includes(q) ||
-          m.category.toLowerCase().includes(q) ||
+          (m.title && m.title.toLowerCase().includes(q)) ||
+          (m.description && m.description.toLowerCase().includes(q)) ||
+          (m.category && m.category.toLowerCase().includes(q)) ||
           (Array.isArray(m.ingredients) &&
             m.ingredients.some((ing) => ing.toLowerCase().includes(q)))
       );
     }
 
     return sortHomeMeals(result, homeSort);
-  }, [selectedCategory, searchQuery, homeSort]);
+  }, [liveMenu, selectedCategory, searchQuery, homeSort]);
 
   const currentSortObj =
     SORT_OPTIONS.find((s) => s.id === homeSort) || SORT_OPTIONS[0];
@@ -440,7 +498,7 @@ export default function HomeScreen() {
               scrollEventThrottle={16}
               contentContainerStyle={{ paddingHorizontal: 20 }}
             >
-              {BANNERS.map((banner) => (
+              {activeBanners.map((banner) => (
                 <TouchableOpacity
                   key={banner.id}
                   activeOpacity={0.9}
@@ -485,7 +543,7 @@ export default function HomeScreen() {
 
             {/* Slider Dots Indicator */}
             <View className="flex-row justify-center items-center mt-3">
-              {BANNERS.map((banner, index) => {
+              {activeBanners.map((banner, index) => {
                 const isActive = activeBannerIndex === index;
                 return (
                   <TouchableOpacity
@@ -527,8 +585,12 @@ export default function HomeScreen() {
                 showsHorizontalScrollIndicator={false}
                 contentContainerStyle={{ paddingHorizontal: 20 }}
               >
-                {CATEGORIES.map((cat) => {
+                {activeCategories.map((cat) => {
                   const isSelected = selectedCategory === cat.name;
+                  const catImg =
+                    typeof cat.image === "string"
+                      ? { uri: cat.image }
+                      : cat.image;
                   return (
                     <TouchableOpacity
                       key={cat.id}
@@ -548,7 +610,7 @@ export default function HomeScreen() {
                         }`}
                       >
                         <Image
-                          source={{ uri: cat.image }}
+                          source={catImg}
                           style={{
                             width: "100%",
                             height: "100%",
@@ -720,7 +782,7 @@ export default function HomeScreen() {
                         GH₵ {item.price.toFixed(2)}
                       </Text>
 
-                      {item.isAvailable ? (
+                      {item.isAvailable !== false && item.inStock !== false ? (
                         <TouchableOpacity
                           activeOpacity={0.85}
                           onPress={(e) => {

@@ -17,10 +17,15 @@ import { useCart } from "../../context/CartContext";
 export default function FoodDetailScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams();
-  const { addToCart } = useCart();
+  const { addToCart, liveMenu } = useCart();
 
-  // Find item by ID or default to the first bucket
-  const item = MENU_ITEMS.find((food) => food.id === id) || MENU_ITEMS[0];
+  // Find item by ID from Admin Dashboard liveMenu or default
+  const source =
+    liveMenu && Array.isArray(liveMenu) && liveMenu.length > 0
+      ? liveMenu
+      : MENU_ITEMS;
+  const item = source.find((food) => food.id === id) || source[0];
+  const isAvailable = item.inStock !== false && item.isAvailable !== false;
 
   const [isFavorite, setIsFavorite] = useState(false);
   const [selectedSize, setSelectedSize] = useState(0); // Index of portionSizes
@@ -47,6 +52,7 @@ export default function FoodDetailScreen() {
   };
 
   const handleAddToCart = () => {
+    if (!isAvailable) return;
     const selectedPortion = item.portionSizes ? item.portionSizes[selectedSize]?.name : null;
     const spiceLevel = item.spicyLevels ? item.spicyLevels[selectedSpicy] : null;
     const addons = (item.availableAddons || [])
@@ -384,11 +390,18 @@ export default function FoodDetailScreen() {
         {/* Add to Cart CTA */}
         <TouchableOpacity
           activeOpacity={0.88}
+          disabled={!isAvailable}
           onPress={handleAddToCart}
-          className="flex-1 bg-[#FF6000] py-4 rounded-full flex-row items-center justify-between px-6"
+          className={`flex-1 py-4 rounded-full flex-row items-center justify-between px-6 ${
+            isAvailable ? "bg-[#FF6000]" : "bg-[#A8A29E]"
+          }`}
         >
           <Text className="text-sm font-black text-white">
-            {addedMessage ? "Added to Cart! ✓" : "Add to Cart"}
+            {!isAvailable
+              ? "Sold Out"
+              : addedMessage
+              ? "Added to Cart! ✓"
+              : "Add to Cart"}
           </Text>
 
           <Text className="text-base font-black text-white">

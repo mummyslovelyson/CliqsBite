@@ -1,4 +1,13 @@
-import React, { createContext, useContext, useState, useCallback } from "react";
+import React, { createContext, useContext, useState, useCallback, useEffect } from "react";
+import { Platform } from "react-native";
+import {
+  SYNC_KEYS,
+  getSharedData,
+  setSharedData,
+  subscribeToSync,
+  getSyncApiBaseUrl,
+} from "../data/syncBridge";
+import { MENU_ITEMS } from "../data/menuData";
 
 const CartContext = createContext();
 
@@ -20,44 +29,380 @@ function getNextCartItemId(prefix) {
   return `${prefix}-${cartSequence}`;
 }
 
+async function fetchJson(path, options = {}) {
+  const baseUrl = getSyncApiBaseUrl();
+  const response = await fetch(`${baseUrl}${path}`, {
+    headers: {
+      "Content-Type": "application/json",
+      ...(options.headers || {}),
+    },
+    ...options,
+  });
+
+  const contentType = response.headers.get("content-type") || "";
+  const payload = contentType.includes("application/json")
+    ? await response.json()
+    : await response.text();
+
+  if (!response.ok) {
+    const message = typeof payload === "object" ? payload?.message : payload;
+    throw new Error(message || "Request failed");
+  }
+
+  return payload;
+}
+
 export function CartProvider({ children }) {
-  // Starts completely empty — no mock data
+  // Starts clean or synchronizes with shared orders
   const [cart, setCart] = useState([]);
-  const [orders, setOrders] = useState([]);
+  const [orders, setOrders] = useState(() => getSharedData(SYNC_KEYS.ORDERS, []));
   const [notifications, setNotifications] = useState([]);
   const [savedAddresses, setSavedAddresses] = useState([]);
   const [recentSearches, setRecentSearches] = useState([]);
 
+  // Live Food Menu & Catalog (Controlled and managed by Admin Dashboard)
+  const [liveMenu, setLiveMenu] = useState(() => {
+    const saved = getSharedData(SYNC_KEYS.MENU, null);
+    if (saved && Array.isArray(saved) && saved.length > 0) return saved;
+    return MENU_ITEMS;
+  });
+
+  // Live Categories (Controlled by Admin Dashboard)
+  const [liveCategories, setLiveCategories] = useState(() => {
+    return getSharedData(SYNC_KEYS.CATEGORIES, null);
+  });
+
+  // Live Promotions, Banners, and Promo Codes (Controlled by Admin Dashboard)
+  const [livePromotions, setLivePromotions] = useState(() => {
+    return getSharedData(SYNC_KEYS.PROMOTIONS, null);
+  });
+
+  // Live Store Settings (Kitchen online status, delivery fee)
+  const [liveSettings, setLiveSettings] = useState(() => {
+    return getSharedData(SYNC_KEYS.SETTINGS, {
+      isKitchenOpen: true,
+      baseDeliveryFee: 15.0,
+      surgeActive: false,
+    });
+  });
+
   // Authentication State (user must sign up / sign in before accessing cart)
   const [currentUser, setCurrentUser] = useState(null);
 
-  const loginUser = useCallback((userData) => {
-    setCurrentUser(
-      userData || {
-        id: "cust-1",
-        name: "CliqsBite Customer",
-        email: "customer@cliqsbite.com",
-        phone: "+233 24 123 4567",
-        role: "customer",
+  // Subscribe to real-time events from Admin Dashboard
+  useEffect(() => {
+    const unsub = subscribeToSync((event) => {
+      if (
+        event?.key === SYNC_KEYS.ORDERS ||
+        event?.type === "ORDER_CREATED" ||
+        event?.type === "ORDER_STATUS_CHANGED"
+      ) {
+        const fresh = getSharedData(SYNC_KEYS.ORDERS, null);
+        if (fresh && Array.isArray(fresh)) {
+          setOrders(fresh);
+        }
       }
-    );
+
+      if (event?.key === SYNC_KEYS.MENU || event?.type === "MENU_UPDATED") {
+        const fresh = getSharedData(SYNC_KEYS.MENU, null);
+        if (fresh && Array.isArray(fresh) && fresh.length > 0) {
+          setLiveMenu(fresh);
+        }
+      }
+
+      if (event?.key === SYNC_KEYS.CATEGORIES) {
+        const fresh = getSharedData(SYNC_KEYS.CATEGORIES, null);
+        if (fresh && Array.isArray(fresh)) {
+          setLiveCategories(fresh);
+        }
+      }
+
+      if (event?.key === SYNC_KEYS.PROMOTIONS || event?.type === "PROMOTIONS_UPDATED") {
+        const fresh = getSharedData(SYNC_KEYS.PROMOTIONS, null);
+        if (fresh) {
+          setLivePromotions(fresh);
+        }
+      }
+
+      if (event?.key === SYNC_KEYS.SETTINGS) {
+        const fresh = getSharedData(SYNC_KEYS.SETTINGS, null);
+        if (fresh) {
+          setLiveSettings(fresh);
+        }
+      }
+
+      if (event?.key === SYNC_KEYS.CUSTOMERS || event?.type === "CUSTOMER_UPDATED") {
+        if (event?.data && Array.isArray(event.data)) {
+          setCurrentUser((prevUser) => {
+            if (!prevUser) return prevUser;
+            const freshMe = event.data.find(
+              (c) => c.id === prevUser.id || c.phone === prevUser.phone || c.email === prevUser.email
+            );
+            return freshMe ? { ...prevUser, ...freshMe } : prevUser;
+          });
+        }
+      }
+    });
+    return () => unsub();
   }, []);
 
-  const signupUser = useCallback((userData) => {
-    setCurrentUser(
-      userData || {
-        id: `cust-${Date.now()}`,
-        name: "New Customer",
-        email: "newcustomer@cliqsbite.com",
-        phone: "+233 24 000 0000",
-        role: "customer",
+  const loginUser = useCallback(async (inputData) => {
+    const email = inputData?.email || (inputData?.phone && inputData.phone.includes("@") ? inputData.phone : undefined);
+    const phone = inputData?.phone && !inputData.phone.includes("@") ? inputData.phone : undefined;
+    const password = inputData?.password || "password123";
+
+    try {
+      const response = await fetchJson("/api/auth/login", {
+        method: "POST",
+        body: JSON.stringify({
+          email: email || undefined,
+          phone: phone || undefined,
+          password,
+        }),
+      });
+
+      const user = response?.user || response;
+      const normalized = {
+        ...user,
+        id: String(user.id ?? inputData?.id ?? `cust-${Date.now()}`),
+        name: user.name || inputData?.name || "CliqsBite Customer",
+        email: user.email || inputData?.email || "customer@cliqsbite.com",
+        phone: user.phone || inputData?.phone || "+233 24 123 4567",
+        role: user.role || "customer",
+        walletBalance: user.walletBalance ?? 15.0,
+        cliqsPoints: user.cliqsPoints ?? 100,
+        status: user.status || "active",
+      };
+
+      setCurrentUser(normalized);
+      return normalized;
+    } catch (error) {
+      console.warn("Backend login failed, using local fallback:", error.message);
+    }
+
+    try {
+      const existingCustomers = getSharedData(SYNC_KEYS.CUSTOMERS, []);
+      const query = (
+        inputData?.email ||
+        inputData?.phone ||
+        inputData?.name ||
+        ""
+      )
+        .toLowerCase()
+        .trim();
+      const match = Array.isArray(existingCustomers)
+        ? existingCustomers.find(
+            (c) =>
+              (c.email && c.email.toLowerCase() === query) ||
+              (c.phone &&
+                c.phone.replace(/\s+/g, "") === query.replace(/\s+/g, "")) ||
+              (c.id && c.id === inputData?.id)
+          )
+        : null;
+
+      if (match) {
+        setCurrentUser(match);
+        return match;
       }
-    );
+    } catch (e) {
+      console.warn("Failed to lookup existing customer on login:", e);
+    }
+
+    const fallbackUser = {
+      id: inputData?.id || `cust-${Date.now()}`,
+      name: inputData?.name || "CliqsBite Customer",
+      email: inputData?.email || "customer@cliqsbite.com",
+      phone: inputData?.phone || "+233 24 123 4567",
+      role: "customer",
+      walletBalance: 15.0,
+      cliqsPoints: 100,
+      status: "active",
+    };
+    setCurrentUser(fallbackUser);
+    return fallbackUser;
+  }, [setCurrentUser]);
+
+  const signupUser = useCallback(async (userData) => {
+    const defaultAvatar =
+      "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80";
+    const now = new Date();
+    const password = userData?.password || "password123";
+
+    try {
+      const response = await fetchJson("/api/auth/register", {
+        method: "POST",
+        body: JSON.stringify({
+          name: userData?.name,
+          email: userData?.email,
+          phone: userData?.phone,
+          password,
+          primaryZone: userData?.primaryZone,
+          primaryAddress: userData?.primaryAddress,
+          landmark: userData?.landmark,
+          dietaryPreference: userData?.dietaryPreference,
+          role: userData?.role || "customer",
+        }),
+      });
+
+      const createdUser = response?.user || response;
+      const normalized = {
+        ...createdUser,
+        id: String(createdUser.id ?? userData?.id ?? `cust-${Date.now()}`),
+        name: createdUser.name || userData?.name || "New CliqsBite Customer",
+        email: createdUser.email || userData?.email || "customer@cliqsbite.com",
+        phone: createdUser.phone || userData?.phone || "+233 24 000 0000",
+        walletBalance: createdUser.walletBalance ?? 15.0,
+        cliqsPoints: createdUser.cliqsPoints ?? 100,
+        role: createdUser.role || userData?.role || "customer",
+      };
+
+      setCurrentUser(normalized);
+      setSharedData(SYNC_KEYS.CUSTOMERS, [normalized], "CUSTOMER_REGISTERED");
+      return normalized;
+    } catch (error) {
+      console.warn("Backend registration failed, using local fallback:", error.message);
+    }
+
+    const fullCustomer = {
+      id: userData?.id || `cust-${Date.now()}`,
+      name: userData?.name || "New CliqsBite Customer",
+      email: userData?.email || "customer@cliqsbite.com",
+      phone: userData?.phone || "+233 24 000 0000",
+      avatar: userData?.avatar || defaultAvatar,
+      primaryZone: userData?.primaryZone || "East Legon",
+      primaryAddress:
+        userData?.primaryAddress ||
+        `${userData?.primaryZone || "East Legon"}, Accra, Ghana`,
+      landmark: userData?.landmark || "Main Gate / Reception",
+      savedAddresses: userData?.savedAddresses || [
+        {
+          label: "Home",
+          address:
+            userData?.primaryAddress ||
+            `${userData?.primaryZone || "East Legon"}, Accra`,
+          zone: userData?.primaryZone || "East Legon",
+          isDefault: true,
+        },
+      ],
+      totalOrders: 0,
+      totalSpent: 0.0,
+      walletBalance: 15.0,
+      cliqsPoints: 100,
+      loyaltyTier: "Bronze Starter",
+      referralsCount: 0,
+      dietaryPreference: userData?.dietaryPreference || "Standard / Halal",
+      joinDate: now.toISOString().split("T")[0],
+      registrationTime: now.toLocaleTimeString([], {
+        hour: "2-digit",
+        minute: "2-digit",
+      }),
+      lastActivity: "Just registered on mobile app",
+      status: "active",
+      isPhoneVerified: true,
+      isEmailVerified: true,
+      deviceInfo:
+        Platform.OS === "ios"
+          ? "Apple iPhone (iOS)"
+          : Platform.OS === "android"
+          ? "Android Mobile"
+          : "CliqsBite Mobile Web",
+      role: "customer",
+      notes: [
+        {
+          id: `note-${Date.now()}`,
+          author: "System (Auth)",
+          text: `Customer signed up via CliqsBite Mobile App. Zone: ${
+            userData?.primaryZone || "East Legon"
+          }.`,
+          date: now.toISOString().split("T")[0],
+        },
+      ],
+    };
+
+    setCurrentUser(fullCustomer);
+
+    try {
+      const existing = getSharedData(SYNC_KEYS.CUSTOMERS, []);
+      const currentList = Array.isArray(existing) ? existing : [];
+      const mockNames = [
+        "Akosua Serwaa",
+        "Kojo Boateng",
+        "Esi Mensah-Bonsu",
+        "Nana Yaw Darko",
+        "Dr. Selasi Gbeho",
+        "Afiya Poku",
+        "Michael Ashitey",
+      ];
+      const realExisting = currentList.filter(
+        (c) =>
+          !mockNames.includes(c?.name) &&
+          !["cust-1", "cust-2", "cust-3", "cust-4", "cust-5", "cust-6", "cust-7"].includes(c?.id)
+      );
+      const updated = [
+        fullCustomer,
+        ...realExisting.filter(
+          (c) =>
+            c.phone !== fullCustomer.phone && c.email !== fullCustomer.email
+        ),
+      ];
+      setSharedData(SYNC_KEYS.CUSTOMERS, updated, "CUSTOMER_REGISTERED");
+    } catch (e) {
+      console.error("Failed to broadcast new customer to admin:", e);
+    }
+
+    const notifId = getNextNotifId();
+    setNotifications((prev) => [
+      {
+        id: notifId,
+        title: "Welcome to CliqsBite! 🍗🎉",
+        message:
+          "Your account has been created. GH₵ 15.00 welcome credit and 100 CliqsPoints added to your wallet!",
+        time: "Just now",
+        type: "promo",
+        read: false,
+      },
+      ...prev,
+    ]);
+  }, [setCurrentUser]);
+
+  useEffect(() => {
+    const loadServerState = async () => {
+      try {
+        const menu = await fetchJson("/api/menu");
+        if (Array.isArray(menu) && menu.length > 0) {
+          setLiveMenu(menu);
+          setSharedData(SYNC_KEYS.MENU, menu, "MENU_UPDATED");
+        }
+      } catch (error) {
+        console.warn("Menu sync skipped:", error.message);
+      }
+
+      try {
+        const settings = await fetchJson("/api/settings");
+        if (settings && typeof settings === "object") {
+          setLiveSettings(settings);
+          setSharedData(SYNC_KEYS.SETTINGS, settings, "SETTINGS_UPDATED");
+        }
+      } catch (error) {
+        console.warn("Settings sync skipped:", error.message);
+      }
+
+      try {
+        const riders = await fetchJson("/api/riders");
+        if (Array.isArray(riders)) {
+          setSharedData(SYNC_KEYS.RIDERS, riders, "RIDER_STATUS_CHANGED");
+        }
+      } catch (error) {
+        console.warn("Rider sync skipped:", error.message);
+      }
+    };
+
+    loadServerState();
   }, []);
 
   const logoutUser = useCallback(() => {
     setCurrentUser(null);
-  }, []);
+  }, [setCurrentUser]);
 
   const isAuthenticated = Boolean(currentUser);
 
@@ -100,6 +445,9 @@ export function CartProvider({ children }) {
    * Add item to cart
    */
   const addToCart = useCallback((newItem) => {
+    if (newItem?.inStock === false || newItem?.isAvailable === false) {
+      return false;
+    }
     setCart((prevCart) => {
       const existingIndex = prevCart.findIndex((item) => {
         const sameId = item.id === newItem.id;
@@ -131,6 +479,7 @@ export function CartProvider({ children }) {
         },
       ];
     });
+    return true;
   }, []);
 
   /**
@@ -212,7 +561,49 @@ export function CartProvider({ children }) {
       review: null,
     };
 
-    setOrders((prev) => [newOrder, ...prev]);
+    const normalizedOrder = {
+      ...newOrder,
+      totalAmount: newOrder.total,
+      zone: orderData.deliveryAddress?.split(",")[0] || "East Legon",
+      customer: {
+        name: currentUser?.name || orderData.customerName || "CliqsBite Customer",
+        phone: currentUser?.phone || orderData.customerPhone || "+233 24 123 4567",
+        address: orderData.deliveryAddress || "Accra, Ghana",
+        zone: orderData.deliveryAddress?.split(",")[0] || "East Legon",
+      },
+    };
+
+    setOrders((prev) => {
+      const updated = [normalizedOrder, ...prev];
+      setSharedData(SYNC_KEYS.ORDERS, updated, "ORDER_CREATED");
+      return updated;
+    });
+
+    // Update customer spending & order count for Admin
+    try {
+      const currentCustList = getSharedData(SYNC_KEYS.CUSTOMERS, []);
+      if (Array.isArray(currentCustList) && currentCustList.length > 0) {
+        const custPhone = currentUser?.phone || orderData.customerPhone;
+        const custEmail = currentUser?.email;
+        const updatedCustList = currentCustList.map((c) => {
+          if (
+            (custPhone && c.phone === custPhone) ||
+            (custEmail && c.email === custEmail)
+          ) {
+            return {
+              ...c,
+              totalOrders: (c.totalOrders || 0) + 1,
+              totalSpent: (c.totalSpent || 0) + (normalizedOrder.totalAmount || 0),
+              lastActivity: `Just now (Placed Order #${orderId})`,
+            };
+          }
+          return c;
+        });
+        setSharedData(SYNC_KEYS.CUSTOMERS, updatedCustList, "CUSTOMER_UPDATED");
+      }
+    } catch (e) {
+      console.error("Failed to update customer order count:", e);
+    }
 
     // Send push / in-app notification
     const newNotif = {
@@ -226,26 +617,28 @@ export function CartProvider({ children }) {
     setNotifications((prev) => [newNotif, ...prev]);
 
     setCart([]);
-    return newOrder;
-  }, []);
+    return normalizedOrder;
+  }, [currentUser]);
 
   /**
    * Rate an order (meals & rider service)
    */
   const rateOrder = useCallback((orderId, rating, review, riderRating = 5) => {
-    setOrders((prev) =>
-      prev.map((ord) =>
+    setOrders((prev) => {
+      const updated = prev.map((ord) =>
         ord.id === orderId ? { ...ord, rating, review, riderRating } : ord
-      )
-    );
+      );
+      setSharedData(SYNC_KEYS.ORDERS, updated, "ORDER_STATUS_CHANGED");
+      return updated;
+    });
   }, []);
 
   /**
    * Cancel an active order with automatic refund notice
    */
   const cancelOrder = useCallback((orderId, reason = "Cancelled by customer") => {
-    setOrders((prev) =>
-      prev.map((ord) => {
+    setOrders((prev) => {
+      const updated = prev.map((ord) => {
         if (ord.id === orderId) {
           return {
             ...ord,
@@ -258,8 +651,10 @@ export function CartProvider({ children }) {
           };
         }
         return ord;
-      })
-    );
+      });
+      setSharedData(SYNC_KEYS.ORDERS, updated, "ORDER_STATUS_CHANGED");
+      return updated;
+    });
 
     const notifId = getNextNotifId();
     setNotifications((prev) => [
@@ -279,8 +674,8 @@ export function CartProvider({ children }) {
    * Advance order lifecycle milestone (simulates real-time kitchen & rider progress)
    */
   const advanceOrderStatus = useCallback((orderId) => {
-    setOrders((prev) =>
-      prev.map((ord) => {
+    setOrders((prev) => {
+      const updated = prev.map((ord) => {
         if (ord.id === orderId) {
           const currentStep = ord.step || 2;
           const nextStep = currentStep + 1;
@@ -339,8 +734,10 @@ export function CartProvider({ children }) {
           };
         }
         return ord;
-      })
-    );
+      });
+      setSharedData(SYNC_KEYS.ORDERS, updated, "ORDER_STATUS_CHANGED");
+      return updated;
+    });
   }, []);
 
   /**
@@ -380,12 +777,102 @@ export function CartProvider({ children }) {
     setNotifications([]);
   }, []);
 
+  // Coupon validator driven by Admin Dashboard promotions
+  const validateCoupon = useCallback(
+    (code, subtotalAmount) => {
+      if (!code || !code.trim()) {
+        return { valid: false, message: "Please enter a coupon code." };
+      }
+      const cleanCode = code.trim().toUpperCase();
+
+      // Look up in livePromotions.coupons from Admin Dashboard
+      const promoList = livePromotions?.coupons || [];
+      const found = promoList.find(
+        (c) => (c.code || "").toUpperCase() === cleanCode
+      );
+
+      // Fallback built-in vouchers if none configured in Admin Dashboard
+      if (!found) {
+        if (cleanCode === "CLIQS25") {
+          if (subtotalAmount < 50) {
+            return {
+              valid: false,
+              message: "Minimum order of GH₵ 50.00 required for this coupon.",
+            };
+          }
+          return {
+            valid: true,
+            code: "CLIQS25",
+            title: "GH₵ 25 Welcome Discount",
+            discountAmount: Math.min(25.0, subtotalAmount),
+            discountType: "fixed",
+          };
+        }
+        if (cleanCode === "FREESHIP") {
+          return {
+            valid: true,
+            code: "FREESHIP",
+            title: "Free Delivery Voucher",
+            discountAmount: 0.0,
+            freeDelivery: true,
+            discountType: "free_delivery",
+          };
+        }
+        return {
+          valid: false,
+          message: "This coupon code is invalid or has expired.",
+        };
+      }
+
+      if (found.isActive === false) {
+        return {
+          valid: false,
+          message:
+            "This coupon code is currently inactive or deactivated by admin.",
+        };
+      }
+
+      const minSpend = Number(found.minOrderAmount) || 0;
+      if (subtotalAmount < minSpend) {
+        return {
+          valid: false,
+          message: `Minimum order of GH₵ ${minSpend.toFixed(
+            2
+          )} required for code ${cleanCode}.`,
+        };
+      }
+
+      let discount = 0;
+      if (found.discountType === "percentage" || found.type === "percentage") {
+        const pct = Number(found.discountValue) || Number(found.value) || 0;
+        discount = (subtotalAmount * pct) / 100;
+      } else {
+        discount = Number(found.discountValue) || Number(found.value) || 0;
+      }
+
+      discount = Math.min(discount, subtotalAmount);
+
+      return {
+        valid: true,
+        code: found.code,
+        title: found.description || found.title || `${found.code} Voucher`,
+        discountAmount: discount,
+        discountType: found.discountType,
+      };
+    },
+    [livePromotions]
+  );
+
   const cartCount = cart.reduce((totalQty, item) => totalQty + item.quantity, 0);
   const subtotal = cart.reduce(
     (totalPrice, item) => totalPrice + item.price * item.quantity,
     0
   );
-  const deliveryFee = cart.length > 0 ? 15.0 : 0.0;
+  const baseDeliveryFee =
+    liveSettings?.baseDeliveryFee !== undefined
+      ? Number(liveSettings.baseDeliveryFee)
+      : 15.0;
+  const deliveryFee = cart.length > 0 ? baseDeliveryFee : 0.0;
   const total = Math.max(0, subtotal + deliveryFee);
 
   return (
@@ -428,6 +915,12 @@ export function CartProvider({ children }) {
         hasCompletedOnboarding,
         completeOnboarding,
         resetOnboarding,
+        // Live Admin Dashboard Managed States
+        liveMenu,
+        liveCategories,
+        livePromotions,
+        liveSettings,
+        validateCoupon,
       }}
     >
       {children}

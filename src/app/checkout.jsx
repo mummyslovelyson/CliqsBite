@@ -16,7 +16,16 @@ import { useCart } from "../context/CartContext";
 
 export default function CheckoutScreen() {
   const router = useRouter();
-  const { cart, subtotal, placeOrder, savedAddresses, currentUser, isAuthenticated } = useCart();
+  const {
+    cart,
+    subtotal,
+    placeOrder,
+    savedAddresses,
+    currentUser,
+    isAuthenticated,
+    validateCoupon,
+    liveSettings,
+  } = useCart();
   const [deliveryType, setDeliveryType] = useState("delivery"); // 'delivery' or 'pickup'
   const [deliveryAddress, setDeliveryAddress] = useState(
     savedAddresses && savedAddresses.length > 0 ? savedAddresses[0].address : ""
@@ -36,9 +45,17 @@ export default function CheckoutScreen() {
   const [appliedPromo, setAppliedPromo] = useState(null);
   const [discountAmount, setDiscountAmount] = useState(0.0);
 
-  // Pricing based on real cart
-  const baseDeliveryFee = deliveryType === "delivery" ? (cart.length > 0 ? 15.0 : 0.0) : 0.0;
-  const deliveryFee = appliedPromo?.code === "FREESHIP" ? 0.0 : baseDeliveryFee;
+  // Pricing based on real cart and Admin Settings
+  const settingFee =
+    liveSettings?.baseDeliveryFee !== undefined
+      ? Number(liveSettings.baseDeliveryFee)
+      : 15.0;
+  const baseDeliveryFee =
+    deliveryType === "delivery" ? (cart.length > 0 ? settingFee : 0.0) : 0.0;
+  const deliveryFee =
+    appliedPromo?.freeDelivery || appliedPromo?.code === "FREESHIP"
+      ? 0.0
+      : baseDeliveryFee;
   const total = Math.max(0, subtotal + deliveryFee - discountAmount);
 
   const handleApplyPromo = () => {
@@ -48,20 +65,23 @@ export default function CheckoutScreen() {
       return;
     }
 
-    if (code === "CLIQS25") {
-      setAppliedPromo({ code, name: "GH₵ 25 Welcome Discount" });
-      setDiscountAmount(25.0);
-      Alert.alert("Promo Applied! 🎉", "GH₵ 25.00 has been deducted from your order.");
-    } else if (code === "FREESHIP") {
-      setAppliedPromo({ code, name: "Free Delivery Voucher" });
-      setDiscountAmount(0.0);
-      Alert.alert("Promo Applied! 🚚", "Delivery fee has been waived!");
-    } else if (code === "HOTWINGS") {
-      setAppliedPromo({ code, name: "Pepper Dip Special" });
-      setDiscountAmount(10.0);
-      Alert.alert("Promo Applied! 🍗", "GH₵ 10.00 discount applied to your combo.");
+    const result = validateCoupon ? validateCoupon(code, subtotal) : null;
+    if (result && result.valid) {
+      setAppliedPromo(result);
+      setDiscountAmount(result.discountAmount || 0);
+      Alert.alert(
+        "Promo Applied! 🎉",
+        result.discountAmount > 0
+          ? `GH₵ ${result.discountAmount.toFixed(
+              2
+            )} discount applied to your order!`
+          : "Free delivery applied to your order!"
+      );
     } else {
-      Alert.alert("Invalid Code", "This voucher code is invalid or expired. Try 'CLIQS25'.");
+      Alert.alert(
+        "Invalid Coupon",
+        result?.message || "This voucher code is invalid or expired."
+      );
     }
     setPromoInput("");
   };
@@ -72,6 +92,13 @@ export default function CheckoutScreen() {
   };
 
   const handlePlaceOrder = () => {
+    if (liveSettings?.isKitchenOpen === false) {
+      Alert.alert(
+        "Kitchen Closed",
+        "The CliqsBite kitchen is currently closed for incoming orders as set by admin. Please check back shortly."
+      );
+      return;
+    }
     if (cart.length === 0) {
       Alert.alert("Empty Cart", "Please add meals to your cart before proceeding to checkout.", [
         { text: "Browse Menu", onPress: () => router.push("/menu") },

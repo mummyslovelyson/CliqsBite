@@ -22,17 +22,60 @@ export default function RegisterScreen() {
   const [fullName, setFullName] = useState("");
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
+  const [zone, setZone] = useState("East Legon");
+  const [deliveryAddress, setDeliveryAddress] = useState("");
+  const [landmark, setLandmark] = useState("");
+  const [dietary] = useState("Standard / Halal");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [agreed, setAgreed] = useState(true);
 
+  const ACCRA_ZONES = [
+    "East Legon",
+    "Airport Residential",
+    "Osu",
+    "Cantonments",
+    "Spintex",
+    "Dansoman",
+  ];
+
   const handleRegister = () => {
+    if (password.length < 6) {
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      return;
+    }
+
+    if (!agreed) {
+      return;
+    }
+
+    const cleanName = fullName.trim() || "New CliqsBite Customer";
+    const cleanPhone = phone.trim() || "+233 24 000 0000";
+    const cleanEmail = email.trim() || `${cleanName.toLowerCase().replace(/\s+/g, ".")}@example.com`;
+    const cleanAddress = deliveryAddress.trim() || `${zone}, Accra, Ghana`;
+
     signupUser({
       id: `cust-${Date.now()}`,
-      name: fullName.trim() || "CliqsBite Customer",
-      email: email.trim() || "customer@cliqsbite.com",
-      phone: phone.trim() || "+233 24 000 0000",
+      name: cleanName,
+      email: cleanEmail,
+      phone: cleanPhone,
+      password,
+      primaryZone: zone,
+      primaryAddress: cleanAddress,
+      landmark: landmark.trim() || "Main Gate / Reception",
+      savedAddresses: [
+        {
+          label: "Home",
+          address: cleanAddress,
+          zone: zone,
+          isDefault: true,
+        },
+      ],
+      dietaryPreference: dietary,
       role: "customer",
     });
 
@@ -70,8 +113,11 @@ export default function RegisterScreen() {
 
         {/* Form Card */}
         <View className="bg-white border border-[#EFE5D6] rounded-[28px] p-6 mb-5">
-          <Text className="text-lg font-black text-[#1C1917] mb-4">
+          <Text className="text-lg font-black text-[#1C1917] mb-1">
             Sign Up 🚀
+          </Text>
+          <Text className="text-xs text-[#78716C] mb-4">
+            Provide your details so our kitchen can deliver hot & fresh to you.
           </Text>
 
           {/* Full Name */}
@@ -84,7 +130,7 @@ export default function RegisterScreen() {
               <TextInput
                 value={fullName}
                 onChangeText={setFullName}
-                placeholder="Enter your full name"
+                placeholder="e.g. Kwame Mensah"
                 placeholderTextColor="#A8A29E"
                 className="flex-1 ml-3 text-xs font-bold text-[#1C1917]"
               />
@@ -94,14 +140,14 @@ export default function RegisterScreen() {
           {/* Phone Number */}
           <View className="mb-3.5">
             <Text className="text-xs font-black uppercase tracking-wider text-[#1C1917] mb-1.5">
-              Phone Number
+              Phone Number (MoMo / WhatsApp)
             </Text>
             <View className="flex-row items-center bg-[#FAF4EB] border border-[#EFE5D6] rounded-2xl px-4 py-2.5">
               <Feather name="phone" size={16} color="#78716C" />
               <TextInput
                 value={phone}
                 onChangeText={setPhone}
-                placeholder="Enter your phone number"
+                placeholder="+233 24 123 4567"
                 placeholderTextColor="#A8A29E"
                 keyboardType="phone-pad"
                 className="flex-1 ml-3 text-xs font-bold text-[#1C1917]"
@@ -119,11 +165,64 @@ export default function RegisterScreen() {
               <TextInput
                 value={email}
                 onChangeText={setEmail}
-                placeholder="Enter your email address"
+                placeholder="kwame.mensah@gmail.com"
                 placeholderTextColor="#A8A29E"
                 keyboardType="email-address"
                 autoCapitalize="none"
                 className="flex-1 ml-3 text-xs font-bold text-[#1C1917]"
+              />
+            </View>
+          </View>
+
+          {/* Primary Accra Zone */}
+          <View className="mb-3.5">
+            <Text className="text-xs font-black uppercase tracking-wider text-[#1C1917] mb-1.5">
+              Delivery Zone
+            </Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} className="flex-row">
+              {ACCRA_ZONES.map((z) => (
+                <TouchableOpacity
+                  key={z}
+                  onPress={() => setZone(z)}
+                  className={`px-3 py-1.5 rounded-full mr-2 border ${
+                    zone === z
+                      ? "bg-[#FF6000] border-[#FF6000]"
+                      : "bg-[#FAF4EB] border-[#EFE5D6]"
+                  }`}
+                >
+                  <Text
+                    className={`text-[11px] font-bold ${
+                      zone === z ? "text-white" : "text-[#78716C]"
+                    }`}
+                  >
+                    {z}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+
+          {/* Street Address & Landmark */}
+          <View className="mb-3.5">
+            <Text className="text-xs font-black uppercase tracking-wider text-[#1C1917] mb-1.5">
+              Street Address & Landmark
+            </Text>
+            <View className="bg-[#FAF4EB] border border-[#EFE5D6] rounded-2xl px-4 py-2.5 mb-2">
+              <TextInput
+                value={deliveryAddress}
+                onChangeText={setDeliveryAddress}
+                placeholder="House / Street (e.g. Boundary Road, House 24)"
+                placeholderTextColor="#A8A29E"
+                className="text-xs font-bold text-[#1C1917]"
+              />
+            </View>
+            <View className="bg-[#FAF4EB] border border-[#EFE5D6] rounded-2xl px-4 py-2.5">
+              <TextInput
+                value={landmark}
+                onChangeText={setLandmark}
+                placeholder="Nearby Landmark (e.g. Near Shell Station / American House)"
+                placeholderTextColor="#A8A29E"
+                className="text-xs font-bold text-[#1C1917]"
               />
             </View>
           </View>
@@ -154,12 +253,12 @@ export default function RegisterScreen() {
           </View>
 
           {/* Confirm Password */}
-          <View className="mb-4">
+          <View className="mb-3.5">
             <Text className="text-xs font-black uppercase tracking-wider text-[#1C1917] mb-1.5">
               Confirm Password
             </Text>
             <View className="flex-row items-center bg-[#FAF4EB] border border-[#EFE5D6] rounded-2xl px-4 py-2.5">
-              <Feather name="check-circle" size={16} color="#78716C" />
+              <Feather name="lock" size={16} color="#78716C" />
               <TextInput
                 value={confirmPassword}
                 onChangeText={setConfirmPassword}

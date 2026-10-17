@@ -166,7 +166,7 @@ function matchMenuItem(item, query, filters) {
 
   // 6. Availability Filter (Order Now)
   if (filters.availableOnly) {
-    if (item.isAvailable !== true) return false;
+    if (item.isAvailable === false || item.inStock === false) return false;
   }
 
   // 7. Preparation Time Max
@@ -260,6 +260,8 @@ export default function MenuScreen() {
     addRecentSearch,
     removeRecentSearch,
     clearRecentSearches,
+    liveMenu,
+    liveCategories,
   } = useCart();
 
   // Search & Filter State
@@ -284,28 +286,48 @@ export default function MenuScreen() {
     }
   }, [params.q, addRecentSearch]);
 
+  // Source menu from Admin Dashboard liveMenu or fallback
+  const catalogSource = useMemo(() => {
+    return liveMenu && Array.isArray(liveMenu) && liveMenu.length > 0
+      ? liveMenu
+      : MENU_ITEMS;
+  }, [liveMenu]);
+
+  // Categories list driven by Admin Dashboard
+  const activeCategoriesList = useMemo(() => {
+    if (
+      liveCategories &&
+      Array.isArray(liveCategories) &&
+      liveCategories.length > 0
+    ) {
+      const enabled = liveCategories.filter((c) => c.isEnabled !== false);
+      return ["All", ...enabled.map((c) => c.name)];
+    }
+    return CATEGORIES_LIST;
+  }, [liveCategories]);
+
   // Compute matching items
   const filteredAndSortedItems = useMemo(() => {
-    const matched = MENU_ITEMS.filter((item) =>
+    const matched = catalogSource.filter((item) =>
       matchMenuItem(item, searchQuery, filters)
     );
     return sortMenuItems(matched, currentSort);
-  }, [searchQuery, filters, currentSort]);
+  }, [catalogSource, searchQuery, filters, currentSort]);
 
   // Draft match count for the Filter Modal button
   const draftMatchCount = useMemo(() => {
-    return MENU_ITEMS.filter((item) =>
+    return catalogSource.filter((item) =>
       matchMenuItem(item, searchQuery, draftFilters)
     ).length;
-  }, [searchQuery, draftFilters]);
+  }, [catalogSource, searchQuery, draftFilters]);
 
   // Spelling suggestions when 0 or few items match
   const spellingSuggestion = useMemo(() => {
     if (filteredAndSortedItems.length === 0 && searchQuery.trim().length >= 3) {
-      return findSpellingSuggestion(searchQuery, MENU_ITEMS);
+      return findSpellingSuggestion(searchQuery, catalogSource);
     }
     return null;
-  }, [filteredAndSortedItems.length, searchQuery]);
+  }, [filteredAndSortedItems.length, searchQuery, catalogSource]);
 
   // Count active filters
   const activeFilterCount = useMemo(() => {
@@ -624,7 +646,7 @@ export default function MenuScreen() {
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={{ paddingHorizontal: 20 }}
         >
-          {CATEGORIES_LIST.map((cat) => {
+          {activeCategoriesList.map((cat) => {
             const active = filters.category === cat;
             return (
               <TouchableOpacity
@@ -954,7 +976,7 @@ export default function MenuScreen() {
                 </View>
 
                 {/* Add to Cart Button (respects availability) */}
-                {item.isAvailable ? (
+                {item.isAvailable !== false && item.inStock !== false ? (
                   <TouchableOpacity
                     activeOpacity={0.8}
                     onPress={(e) => {

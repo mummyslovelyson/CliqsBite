@@ -24,23 +24,26 @@ export default function LoginScreen() {
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
 
-  const handleLogin = () => {
-    loginUser({
-      id: "cust-1",
-      name: emailOrPhone.includes("@")
-        ? emailOrPhone.split("@")[0]
-        : "CliqsBite Customer",
-      email: emailOrPhone.includes("@")
-        ? emailOrPhone
-        : "customer@cliqsbite.com",
-      phone: !emailOrPhone.includes("@") ? emailOrPhone : "+233 24 123 4567",
+  const handleLogin = async () => {
+    const trimmed = emailOrPhone.trim();
+    if (!trimmed || !password.trim()) {
+      return;
+    }
+    const isEmail = trimmed.includes("@");
+    const user = await loginUser({
+      email: isEmail ? trimmed : undefined,
+      phone: !isEmail ? trimmed : undefined,
+      name: isEmail ? trimmed.split("@")[0] : "CliqsBite Customer",
       role: "customer",
+      password: password.trim(),
     });
 
-    if (params.redirect) {
-      router.replace(params.redirect);
-    } else {
-      router.replace("/");
+    if (user) {
+      if (params.redirect) {
+        router.replace(params.redirect);
+      } else {
+        router.replace("/");
+      }
     }
   };
 
