@@ -18,56 +18,28 @@ const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
 const SPECIAL_MENU_IMG = require("../../assets/images/onboarding-special.jpg");
 const BURGERS_PIZZA_IMG = require("../../assets/images/onboarding-burgers-pizza.jpg");
+const BANNER_DEAL_IMG = require("../../assets/images/banner-deal.jpg");
+const BANNER_IMG = require("../../assets/images/banner.jpg");
 
 const ONBOARDING_SLIDES = [
   {
     id: "slide-1",
-    tag: "TODAY'S SPECIAL DISHES 🍲",
-    tagBg: "#EA580C",
-    title: "Daily Specials & Hot Ghanaian Delicacies",
-    description:
-      "Enjoy daily special deals up to 50% off! Savor authentic smoky party jollof, Accra waakye, hot banku, crispy fries, and delicious pastas cooked fresh daily.",
     image: SPECIAL_MENU_IMG,
-    highlight: "Special Deals & Combos",
-    contentFit: "contain",
     cardBg: "#3A0E0E",
   },
   {
     id: "slide-2",
-    tag: "BURGERS, PIZZA & CRISPY CHICKEN 🍔🍕",
-    tagBg: "#DC2626",
-    title: "Gourmet Fast Food & Hottest Promos",
-    description:
-      "Craving juicy chicken burgers, hot cheesy pizza slices, or golden French fries with crispy fried chicken? Order fast with 24/7 delivery right to your door.",
     image: BURGERS_PIZZA_IMG,
-    highlight: "Up to 50% Off Promos",
-    contentFit: "contain",
     cardBg: "#1C0505",
   },
   {
     id: "slide-3",
-    tag: "AI CHEF & VOICE AGENT 🤖",
-    tagBg: "#7C3AED",
-    title: "Order With Your Voice or Chat",
-    description:
-      "Tap the new AI Bot tab to speak or chat naturally. Tell Chef Kwame 'Find spicy meals under 80 cedis' and watch your recommendations appear instantly.",
-    image:
-      "https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=900&auto=format&fit=crop&q=80",
-    highlight: "Hands-Free Ordering",
-    contentFit: "cover",
+    image: BANNER_DEAL_IMG,
     cardBg: "#1C1917",
   },
   {
     id: "slide-4",
-    tag: "LIGHTNING FAST DISPATCH & MOMO 🛵💳",
-    tagBg: "#16A34A",
-    title: "Live GPS Tracking & Instant MoMo Pay",
-    description:
-      "Dispatched in heat-retaining thermal packs. Track your assigned rider live on the interactive map and pay securely with MTN MoMo, Telecel Cash, or cards.",
-    image:
-      "https://images.unsplash.com/photo-1617347454431-f49d7ff5c3b1?w=900&auto=format&fit=crop&q=80",
-    highlight: "Live Tracking & Cashless",
-    contentFit: "cover",
+    image: BANNER_IMG,
     cardBg: "#1C1917",
   },
 ];
@@ -163,29 +135,23 @@ export default function OnboardingScreen({ onComplete }) {
             key={slide.id}
             style={[styles.slideContainer, { width: SCREEN_WIDTH }]}
           >
-            {/* Slide Hero Card with Image */}
-            <View style={[styles.imageCard, slide.cardBg ? { backgroundColor: slide.cardBg } : null]}>
+            {/* Slide Image Alone */}
+            <View
+              style={[
+                styles.imageCard,
+                slide.cardBg ? { backgroundColor: slide.cardBg } : null,
+              ]}
+            >
               <Image
-                source={typeof slide.image === "string" ? { uri: slide.image } : slide.image}
-                style={{ width: "100%", height: "100%" }}
-                contentFit={slide.contentFit || "contain"}
+                source={
+                  typeof slide.image === "string"
+                    ? { uri: slide.image }
+                    : slide.image
+                }
+                style={styles.slideImage}
+                contentFit="contain"
                 transition={200}
               />
-              <View style={styles.overlay}>
-                <View style={[styles.badge, { backgroundColor: slide.tagBg }]}>
-                  <Text style={styles.badgeText}>{slide.tag}</Text>
-                </View>
-
-                <View style={styles.highlightBadge}>
-                  <Text style={styles.highlightText}>{slide.highlight}</Text>
-                </View>
-              </View>
-            </View>
-
-            {/* Slide Narrative Content */}
-            <View style={styles.textContainer}>
-              <Text style={styles.titleText}>{slide.title}</Text>
-              <Text style={styles.descText}>{slide.description}</Text>
             </View>
           </View>
         ))}
@@ -313,10 +279,10 @@ const styles = StyleSheet.create({
     color: "#78716C",
   },
   slideContainer: {
-    paddingHorizontal: 20,
+    paddingHorizontal: 16,
     flex: 1,
-    justifyContent: "space-between",
-    paddingVertical: 6,
+    paddingTop: 6,
+    paddingBottom: 16,
   },
   imageCard: {
     flex: 1,
@@ -325,61 +291,13 @@ const styles = StyleSheet.create({
     backgroundColor: "#1C1917",
     borderWidth: 1,
     borderColor: "#EFE5D6",
-    maxHeight: "58%",
-    position: "relative",
     justifyContent: "center",
     alignItems: "center",
+    elevation: 3,
   },
-  overlay: {
-    position: "absolute",
-    top: 14,
-    left: 14,
-    right: 14,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    zIndex: 10,
-  },
-  badge: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 999,
-  },
-  badgeText: {
-    fontSize: 9,
-    fontWeight: "900",
-    color: "#ffffff",
-    letterSpacing: 0.5,
-  },
-  highlightBadge: {
-    backgroundColor: "rgba(0, 0, 0, 0.65)",
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.2)",
-  },
-  highlightText: {
-    fontSize: 10,
-    fontWeight: "900",
-    color: "#ffffff",
-  },
-  textContainer: {
-    paddingVertical: 14,
-  },
-  titleText: {
-    fontSize: 22,
-    fontWeight: "900",
-    color: "#1C1917",
-    letterSpacing: -0.5,
-    lineHeight: 28,
-    marginBottom: 6,
-  },
-  descText: {
-    fontSize: 13,
-    fontWeight: "500",
-    color: "#78716C",
-    lineHeight: 20,
+  slideImage: {
+    width: "100%",
+    height: "100%",
   },
   footer: {
     paddingHorizontal: 24,
